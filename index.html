@@ -3,12 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Turta Koşusu</title>
+    <title>Turta Yakalama Oyunu</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <div id="scoreBoard">Skor: 0</div>
+    
+    <div id="gameOverScreen">
+        <h1>Oyun Bitti!</h1>
+        <p id="finalScore">Skorun: 0</p>
+        <button onclick="resetGame()">Tekrar Oyna</button>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
-    <div id="loadingMessage">Yükleniyor...</div>
+
     <script src="game.js"></script>
 </body>
 </html>

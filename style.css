@@ -1,24 +1,56 @@
 body {
     margin: 0;
     padding: 0;
-    overflow: hidden;
+    overflow: hidden; /* Kaydırma çubuklarını gizle */
     background-color: #333;
-    touch-action: none; /* Mobilde zoom ve kaydırmayı kapatır */
+    font-family: 'Arial', sans-serif;
+    touch-action: none; /* Mobilde sayfanın kaymasını engeller */
 }
 
 canvas {
     display: block;
-    width: 100%;
-    height: 100vh;
 }
 
-#loadingMessage {
+#scoreBoard {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 2px 2px 4px #000;
+    z-index: 10;
+    pointer-events: none;
+}
+
+#gameOverScreen {
+    display: none;
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
     color: white;
-    font-size: 24px;
-    font-family: Arial, sans-serif;
-    pointer-events: none;
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    z-index: 20;
+    border: 2px solid #fff;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+button {
+    padding: 12px 30px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    background-color: #ff9800;
+    border: none;
+    color: white;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+button:active {
+    background-color: #e68900;
 }

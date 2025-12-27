@@ -1,228 +1,201 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const scoreElement = document.getElementById('scoreBoard');
+const gameOverScreen = document.getElementById('gameOverScreen');
+const finalScoreElement = document.getElementById('finalScore');
 
-// --- 1. AYARLAR ---
-let gameRunning = false;
-let score = 0;
-let gameSpeed = 6;
-const groundHeight = 100; // Zemin resminin yüksekliği (Piksel)
+// --- RESİMLERİN YÜKLENMESİ ---
+// Senin verdiğin isimlere göre assets klasöründen çağırıyoruz
+const bgImg = new Image();
+bgImg.src = 'assets/arkaplan.png'; 
 
-// Ekran Boyutlandırma
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-// --- 2. RESİMLERİ YÜKLEME (İsimlere Dikkat!) ---
 const playerImg = new Image();
 playerImg.src = 'assets/karakter.png'; 
 
-const obstacleImg = new Image();
-obstacleImg.src = 'assets/turta.png'; // Engelimiz Turta
-
-const backgroundImg = new Image();
-backgroundImg.src = 'assets/arkaplan.png';
+const pieImg = new Image();
+pieImg.src = 'assets/turta.png'; 
 
 const groundImg = new Image();
-groundImg.src = 'assets/zemin.png'; // Yeni eklediğimiz zemin
+groundImg.src = 'assets/zemin.png';
 
-// Yükleme Kontrolü
-let assetsLoaded = 0;
-const totalAssets = 4; // Toplam 4 resim var
-
-function checkAssets() {
-    assetsLoaded++;
-    if (assetsLoaded === totalAssets) {
-        document.getElementById('loadingMessage').style.display = 'none';
-        startGame();
-    }
+// --- EKRAN AYARLARI ---
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 }
+window.addEventListener('resize', resize);
+resize();
 
-playerImg.onload = checkAssets;
-obstacleImg.onload = checkAssets;
-backgroundImg.onload = checkAssets;
-groundImg.onload = checkAssets;
+// --- OYUN DEĞİŞKENLERİ ---
+let gameRunning = true;
+let score = 0;
+let frames = 0;
+let dropSpeed = 5; // Turtaların düşüş hızı
 
-// Hata durumunda oyunun donmasını engelle
-playerImg.onerror = () => { console.log("Karakter yok"); checkAssets(); };
-obstacleImg.onerror = () => { console.log("Turta yok"); checkAssets(); };
-backgroundImg.onerror = () => { console.log("Arkaplan yok"); checkAssets(); };
-groundImg.onerror = () => { console.log("Zemin yok"); checkAssets(); };
-
-// --- 3. OYUN NESNELERİ ---
-
+// Oyuncu Ayarları
 const player = {
-    x: 50,
-    // Karakter zemin resminin tam üstünde başlasın:
-    y: canvas.height - groundHeight - 100, 
-    w: 60,  // Karakter genişliği (Gerekirse ayarla)
-    h: 60,  // Karakter yüksekliği
-    dy: 0,
-    jumpPower: -15,
-    gravity: 0.8,
-    grounded: false
+    x: canvas.width / 2,
+    y: canvas.height - 130, // Zeminin hemen üstü
+    width: 80,  
+    height: 80, 
+    speed: 9 // Sağa sola gitme hızı
 };
 
-let obstacles = [];
-let obstacleTimer = 0;
+// Düşen Turtalar
+let pies = [];
 
-// --- 4. KONTROLLER ---
+// Kontrol Durumları
+let leftPressed = false;
+let rightPressed = false;
 
-function jump() {
-    if (player.grounded) {
-        player.dy = player.jumpPower;
-        player.grounded = false;
+// --- KONTROLLER (KLAVYE & DOKUNMATİK) ---
+
+// Klavye
+document.addEventListener('keydown', (e) => {
+    if(e.key === 'ArrowLeft') leftPressed = true;
+    if(e.key === 'ArrowRight') rightPressed = true;
+});
+document.addEventListener('keyup', (e) => {
+    if(e.key === 'ArrowLeft') leftPressed = false;
+    if(e.key === 'ArrowRight') rightPressed = false;
+});
+
+// Mobil Dokunmatik
+document.addEventListener('touchstart', handleTouch, {passive: false});
+document.addEventListener('touchend', () => {
+    leftPressed = false;
+    rightPressed = false;
+});
+
+function handleTouch(e) {
+    // Ekranın yarısından soluna basılırsa sola, sağına basılırsa sağa
+    const touchX = e.touches[0].clientX;
+    if (touchX < canvas.width / 2) {
+        leftPressed = true;
+        rightPressed = false;
+    } else {
+        rightPressed = true;
+        leftPressed = false;
     }
 }
 
-// Dokunmatik (Mobil)
-window.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    jump();
-    if (!gameRunning) resetGame();
-}, { passive: false });
+// --- OYUN FONKSİYONLARI ---
 
-// Klavye (PC)
-window.addEventListener('keydown', function(e) {
-    if (e.code === 'Space' || e.code === 'ArrowUp') {
-        jump();
-        if (!gameRunning) resetGame();
-    }
-});
-
-// --- 5. OYUN MANTIĞI ---
+function spawnPie() {
+    const size = 60; // Turta boyutu
+    // Ekran dışına taşmayacak şekilde rastgele X
+    const x = Math.random() * (canvas.width - size);
+    
+    pies.push({
+        x: x,
+        y: -70, // Ekranın üstünden başlar
+        size: size,
+        speed: dropSpeed + Math.random() * 2 // Hızda ufak rastgelelik
+    });
+}
 
 function update() {
     if (!gameRunning) return;
 
-    // Yerçekimi
-    player.dy += player.gravity;
-    player.y += player.dy;
+    // 1. Oyuncu Hareketi
+    if (leftPressed && player.x > 0) {
+        player.x -= player.speed;
+    }
+    if (rightPressed && player.x + player.width < canvas.width) {
+        player.x += player.speed;
+    }
+    
+    // Y konumunu sürekli güncelle (Ekran dönerse bozulmasın diye)
+    player.y = canvas.height - 130; 
 
-    // Zemin Çarpışması (Zemin resminin üstüne basmalı)
-    // Zemin Y koordinatı = canvas.height - groundHeight
-    if (player.y + player.h > canvas.height - groundHeight) {
-        player.y = canvas.height - groundHeight - player.h;
-        player.dy = 0;
-        player.grounded = true;
+    // 2. Turta Üretimi
+    if (frames % 50 === 0) { // Her ~0.8 saniyede bir
+        spawnPie();
+        // Zorluk: Skor arttıkça hızlansın
+        if(score > 0 && score % 10 === 0) dropSpeed += 0.05;
     }
 
-    // Engel (Turta) Oluşturma
-    obstacleTimer++;
-    if (obstacleTimer > 90 + Math.random() * 50) { // Biraz rastgelelik ekledim
-        obstacles.push({
-            x: canvas.width,
-            y: canvas.height - groundHeight - 50, // Zeminin tam üstünde, 50px boyunda
-            w: 50,
-            h: 50
-        });
-        obstacleTimer = 0;
-    }
+    // 3. Turtaları Güncelle
+    for (let i = 0; i < pies.length; i++) {
+        let p = pies[i];
+        p.y += p.speed;
 
-    // Engelleri Hareket Ettir
-    for (let i = 0; i < obstacles.length; i++) {
-        let obs = obstacles[i];
-        obs.x -= gameSpeed;
-
-        if (obs.x + obs.w < 0) {
-            obstacles.splice(i, 1);
+        // Çarpışma Kontrolü (AABB Yöntemi)
+        if (
+            p.x < player.x + player.width &&
+            p.x + p.size > player.x &&
+            p.y < player.y + player.height &&
+            p.y + p.size > player.y
+        ) {
+            // Yakalandı!
             score++;
+            scoreElement.innerText = "Skor: " + score;
+            pies.splice(i, 1); // Diziden sil
             i--;
         }
-
-        // Çarpışma Kontrolü
-        if (
-            player.x < obs.x + obs.w - 10 && // -10 ve +10'lar çarpışmayı daha hassas yapar
-            player.x + player.w > obs.x + 10 &&
-            player.y < obs.y + obs.h - 10 &&
-            player.y + player.h > obs.y + 10
-        ) {
+        // Yere çarptı mı? (Oyun Biter)
+        else if (p.y > canvas.height - 40) { // Zemin seviyesi
             gameOver();
         }
     }
-}
 
-// --- 6. ÇİZİM ---
+    frames++;
+    requestAnimationFrame(draw);
+    requestAnimationFrame(update);
+}
 
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!gameRunning) return;
 
-    // 1. Arkaplan
-    if (backgroundImg.complete) {
-        ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
+    // A. Arkaplanı Çiz
+    if (bgImg.complete && bgImg.naturalWidth !== 0) {
+        ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
     } else {
-        ctx.fillStyle = "#87CEEB";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#87CEEB"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // 2. Zemin (Resmi ekran genişliğince uzatıyoruz)
-    if (groundImg.complete) {
-        ctx.drawImage(groundImg, 0, canvas.height - groundHeight, canvas.width, groundHeight);
+    // B. Zemini Çiz
+    if (groundImg.complete && groundImg.naturalWidth !== 0) {
+        ctx.drawImage(groundImg, 0, canvas.height - 50, canvas.width, 50);
     } else {
-        ctx.fillStyle = "#654321";
-        ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
+        ctx.fillStyle = "#4CAF50"; ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
     }
 
-    // 3. Karakter
-    if (playerImg.complete) {
-        ctx.drawImage(playerImg, player.x, player.y, player.w, player.h);
+    // C. Karakteri Çiz
+    if (playerImg.complete && playerImg.naturalWidth !== 0) {
+        ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
     } else {
-        ctx.fillStyle = "red";
-        ctx.fillRect(player.x, player.y, player.w, player.h);
+        ctx.fillStyle = "red"; ctx.fillRect(player.x, player.y, player.width, player.height);
     }
 
-    // 4. Engeller (Turta)
-    for (let obs of obstacles) {
-        if (obstacleImg.complete) {
-            ctx.drawImage(obstacleImg, obs.x, obs.y, obs.w, obs.h);
+    // D. Turtaları Çiz
+    for (let p of pies) {
+        if (pieImg.complete && pieImg.naturalWidth !== 0) {
+            ctx.drawImage(pieImg, p.x, p.y, p.size, p.size);
         } else {
-            ctx.fillStyle = "orange";
-            ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+            ctx.fillStyle = "orange"; ctx.fillRect(p.x, p.y, p.size, p.size);
         }
     }
-
-    // 5. Skor
-    ctx.fillStyle = "white";
-    ctx.font = "bold 30px Arial";
-    ctx.strokeStyle = "black"; // Yazı kenarlığı
-    ctx.lineWidth = 3;
-    ctx.strokeText("Skor: " + score, 20, 50);
-    ctx.fillText("Skor: " + score, 20, 50);
-
-    // Oyun Bitti Ekranı
-    if (!gameRunning) {
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = "white";
-        ctx.textAlign = "center";
-        ctx.font = "40px Arial";
-        ctx.fillText("Oyun Bitti!", canvas.width / 2, canvas.height / 2 - 20);
-        ctx.font = "20px Arial";
-        ctx.fillText("Tekrar oynamak için dokun", canvas.width / 2, canvas.height / 2 + 30);
-        ctx.textAlign = "start"; // Ayarı normale döndür
-    }
-}
-
-// --- 7. DÖNGÜ ---
-
-function gameLoop() {
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
-}
-
-function startGame() {
-    gameRunning = true;
-    gameLoop();
-}
-
-function resetGame() {
-    player.y = canvas.height - groundHeight - 100;
-    player.dy = 0;
-    obstacles = [];
-    score = 0;
-    gameRunning = true;
 }
 
 function gameOver() {
     gameRunning = false;
+    gameOverScreen.style.display = 'block';
+    finalScoreElement.innerText = "Skorun: " + score;
 }
+
+// Global Reset Fonksiyonu
+window.resetGame = function() {
+    score = 0;
+    frames = 0;
+    dropSpeed = 5;
+    pies = [];
+    scoreElement.innerText = "Skor: 0";
+    gameOverScreen.style.display = 'none';
+    gameRunning = true;
+    requestAnimationFrame(draw);
+    update();
+}
+
+// Başlat
+update();
